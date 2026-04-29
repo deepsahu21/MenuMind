@@ -1,126 +1,123 @@
-# VectorMind
+# MenuMind
 
-Multi-LLM RAG Evaluation Platform for uploading documents, asking grounded questions, comparing model answers, and scoring answer quality with RAGAS.
+Multi-LLM RAG evaluation platform for restaurant menu Q&A. Ask a question about a menu, get answers from Gemini, Groq (Llama 3), and Claude simultaneously — each scored on faithfulness and relevancy via RAGAs.
 
-## Key Features
+Built this to solve a real problem: when you're picking an LLM for a domain-specific RAG pipeline, "vibes-based" model selection doesn't cut it. MenuMind gives you actual scoring to compare outputs side by side.
 
-- **Conversational RAG** — LangChain LCEL retrieval chain with Pinecone vector search and multi-turn session history.
-- **Browser PDF Upload** — Upload a PDF from the chat input; the backend chunks, embeds, and upserts it to Pinecone.
-- **Multi-LLM Benchmarking** — Compare Gemini Flash, Llama 3.1 8B via Groq, and Claude Haiku on the same retrieved context.
-- **RAGAS Evaluation** — Each benchmark response includes faithfulness and answer relevancy scores.
-- **Demo Status Banner** — The UI calls `/config` on load and shows key status pills for Gemini, Pinecone, Groq, and Anthropic.
+---
+
+## What it does
+
+- **RAG pipeline** — LangChain LCEL with Pinecone vector search and Gemini Flash for generation. Supports multi-turn conversation with session memory.
+- **Multi-LLM benchmarking** — same retrieved context, three different models, concurrent async calls. See who answers better.
+- **RAGAs evaluation** — each model response is scored on faithfulness (is it grounded in the retrieved chunks?) and answer relevancy (does it actually address the question?).
+- **Multi-source ingestion** — upload PDFs, scrape URLs, or ingest plain text via CLI or the browser UI. Not locked to any specific menu or brand.
+- **Demo mode** — frontend detects missing API keys and degrades gracefully. Banner shows which keys are live.
+
+---
+
+## Stack
+
+| Layer | Tech |
+|---|---|
+| Orchestration | LangChain (LCEL) |
+| Vector store | Pinecone |
+| Generation | Gemini Flash, Llama 3 8B (Groq), Claude Haiku |
+| Evaluation | RAGAs |
+| Backend | FastAPI (async) |
+| Frontend | React |
+
+---
 
 ## Setup
 
-1. Install backend dependencies:
-   ```bash
-   pip install -r requirements.txt
-   ```
+```bash
+git clone https://github.com/deepsahu21/MenuMind.git
+cd MenuMind
+pip install -r requirements.txt
+cd frontend && npm install
+```
 
-2. Install frontend dependencies:
-   ```bash
-   cd frontend
-   npm install
-   ```
+Create a `.env` in the project root:
 
-3. Create `.env` in the project root:
-   ```bash
-   GEMINI_API_KEY=your_key_here
-   PINECONE_API_KEY=your_key_here
-   GROQ_API_KEY=your_key_here
-   ANTHROPIC_API_KEY=your_key_here
-   ```
+```
+GEMINI_API_KEY=        # required — powers RAG + embeddings
+PINECONE_API_KEY=      # required — vector store
+GROQ_API_KEY=          # optional — Llama 3 benchmark tab
+ANTHROPIC_API_KEY=     # optional — Claude benchmark tab
+```
 
-4. Start the backend:
-   ```bash
-   cd backend
-   uvicorn main:app --reload
-   ```
-
-5. Start the frontend:
-   ```bash
-   cd frontend
-   npm run dev
-   ```
-
-The frontend usually runs at `http://localhost:5173` and the backend at `http://127.0.0.1:8000`.
-
-## Document Ingestion
-
-The primary demo flow is browser upload:
-
-1. Open VectorMind.
-2. Click the paperclip button next to the chat input.
-3. Choose a PDF.
-4. Wait for the success toast: `Document ingested — X chunks added`.
-5. Ask questions about the uploaded document.
-
-The CLI is still available for local ingestion:
+Run ingestion (loads demo knowledge base):
 
 ```bash
 cd backend
-python ingest.py --type pdf --source ./docs/paper.pdf
-python ingest.py --type url --source https://example.com/article
-python ingest.py --type text --source ./notes.txt
+python ingest.py
 ```
 
-## API Endpoints
+Start the app:
 
-- `GET /health` — Pinecone connectivity and vector count.
-- `GET /config` — Boolean-only API key status: `gemini`, `pinecone`, `groq`, `anthropic`.
-- `POST /query` — Conversational RAG query.
-- `POST /benchmark` — Runs the same retrieved context through all configured benchmark models.
-- `POST /ingest/upload` — Uploads a PDF and ingests it into Pinecone.
+```bash
+# backend
+cd backend && uvicorn main:app --reload
 
-### POST /query
-
-```json
-{
-  "question": "Summarize the uploaded document",
-  "session_id": "optional-uuid-for-multi-turn"
-}
+# frontend (separate terminal)
+cd frontend && npm run dev
 ```
 
-### POST /benchmark
+---
 
-```json
-{
-  "question": "Compare how each model explains the core argument"
-}
+## Ingestion CLI
+
+Ingest your own menus beyond the demo data:
+
+```bash
+# PDF
+python ingest.py --type pdf --source ./menus/menu.pdf --brand chipotle
+
+# URL
+python ingest.py --type url --source https://www.chipotle.com/menu --brand chipotle
+
+# Plain text
+python ingest.py --type text --source ./notes/menu_notes.txt --brand chipotle
 ```
 
-Benchmark responses include:
+---
 
-```json
-{
-  "results": [
-    {
-      "model": "gemini-flash",
-      "answer": "...",
-      "latency_ms": 1234,
-      "tokens": 512,
-      "ragas_faithfulness": 0.91,
-      "ragas_relevancy": 0.86,
-      "error": null
-    }
-  ],
-  "sources": [],
-  "question": "Compare how each model explains the core argument",
-  "latency_ms": 2345
-}
+## API
+
+| Endpoint | Method | Description |
+|---|---|---|
+| `/health` | GET | Pinecone connectivity + vector count |
+| `/config` | GET | Which API keys are configured (booleans only) |
+| `/query` | POST | Conversational RAG with session memory |
+| `/benchmark` | POST | Same question → 3 models → RAGAs scores |
+
+---
+
+## Project structure
+
+```
+MenuMind/
+├── backend/
+│   ├── chain.py          # LangChain LCEL pipeline
+│   ├── benchmark.py      # Multi-LLM runner + RAGAs scoring
+│   ├── main.py           # FastAPI app
+│   ├── ingest.py         # Ingestion CLI
+│   └── ingestion/        # PDF, URL, text loaders
+└── frontend/
+    └── src/
+        ├── App.jsx
+        └── components/
+            ├── BenchmarkPanel.jsx
+            ├── ChatWindow.jsx
+            └── SourcePanel.jsx
 ```
 
-If a model call fails, only that model result includes an `error`; the endpoint still returns the other model results. If RAGAS scoring fails, the score fields return `null`.
+---
 
-## File Breakdown
+## Demo questions
 
-- `backend/main.py` — FastAPI app with query, benchmark, config, health, and upload ingestion endpoints.
-- `backend/chain.py` — LangChain LCEL conversational retrieval pipeline.
-- `backend/benchmark.py` — Concurrent multi-model generation plus RAGAS scoring.
-- `backend/embeddings.py` — Gemini embeddings wrapper fixed to 768 dimensions for Pinecone.
-- `backend/ingest.py` — Local CLI ingestion for PDF, URL, and text sources.
-- `backend/ingestion/` — LangChain document loaders and chunking helpers.
-- `frontend/src/App.jsx` — VectorMind app shell, config banner, benchmark toggle, upload flow.
-- `frontend/src/components/ChatWindow.jsx` — Chat UI, suggestion chips, and PDF attachment button.
-- `frontend/src/components/BenchmarkPanel.jsx` — Model tabs with latency, tokens, errors, and RAGAS progress bars.
-- `frontend/src/components/SourcePanel.jsx` — Retrieved context display.
+- "Does the Beef 'n Cheddar have gluten?"
+- "What are the hottest sauces at Buffalo Wild Wings?"
+- "How do I earn Dunkin' rewards points?"
+- "What's the calorie count on a glazed donut?"
