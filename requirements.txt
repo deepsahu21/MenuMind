@@ -1,0 +1,17 @@
+fastapi
+uvicorn
+pinecone
+google-genai
+python-dotenv
+pydantic
+langchain
+langchain-google-genai
+langchain-pinecone
+langchain-anthropic
+langchain-groq
+langchain-community
+pypdf
+beautifulsoup4
+ragas
+eval-type-backport
+python-multipart
